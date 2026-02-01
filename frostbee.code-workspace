@@ -9,5 +9,8 @@
 		}
 	],
 	"settings": {
+		"nrf-connect.applications": [
+			"${workspaceFolder}/app"
+		]
 	}
 }
