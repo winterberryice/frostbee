@@ -1,22 +1,12 @@
 sample:
-  description: Zigbee application template
-  name: Zigbee application template
+  name: Blinky Sample
 tests:
-  sample.zigbee.template:
-    sysbuild: true
-    build_only: true
-    integration_platforms:
-      - nrf54l15dk/nrf54l15/cpuapp
-      - nrf54l15dk/nrf54l10/cpuapp
-      - nrf52840dk/nrf52840
-      - nrf5340dk/nrf5340/cpuapp
-    platform_allow:
-      - nrf54l15dk/nrf54l15/cpuapp
-      - nrf54l15dk/nrf54l10/cpuapp
-      - nrf52840dk/nrf52840
-      - nrf5340dk/nrf5340/cpuapp
+  sample.basic.blinky:
     tags:
-      - ci_build
-      - smoke
-      - sysbuild
-      - ci_samples_zigbee
+      - LED
+      - gpio
+    filter: dt_enabled_alias_with_parent_compat("led0", "gpio-leds")
+    depends_on: gpio
+    harness: led
+    integration_platforms:
+      - frdm_k64f
