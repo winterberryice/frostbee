@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "sdk",
+			"path": "../../../ncs-r23"
+		}
+	],
+	"settings": {
+	}
+}
