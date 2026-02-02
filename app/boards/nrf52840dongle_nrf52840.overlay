@@ -13,7 +13,7 @@
 	};
 };
 
-/* Primary I2C bus for SHT40: P0.20 = SDA, P0.22 = SCL */
+/* Primary I2C bus for SHT40: P0.24 = SDA, P1.00 = SCL */
 &i2c0 {
 	compatible = "nordic,nrf-twim";
 	status = "okay";
@@ -42,15 +42,15 @@
 &pinctrl {
 	i2c0_default: i2c0_default {
 		group1 {
-			psels = <NRF_PSEL(TWIM_SDA, 0, 20)>,
-				<NRF_PSEL(TWIM_SCL, 0, 22)>;
+			psels = <NRF_PSEL(TWIM_SDA, 0, 24)>,
+				<NRF_PSEL(TWIM_SCL, 1, 0)>;
 		};
 	};
 
 	i2c0_sleep: i2c0_sleep {
 		group1 {
-			psels = <NRF_PSEL(TWIM_SDA, 0, 20)>,
-				<NRF_PSEL(TWIM_SCL, 0, 22)>;
+			psels = <NRF_PSEL(TWIM_SDA, 0, 24)>,
+				<NRF_PSEL(TWIM_SCL, 1, 0)>;
 			low-power-enable;
 		};
 	};

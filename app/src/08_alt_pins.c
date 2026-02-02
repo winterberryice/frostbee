@@ -6,13 +6,13 @@
  *          on P0.20/P0.22.
  *
  * WIRING FOR THIS TEST:
- *   - Move SDA wire from P0.20 to P0.26
- *   - Move SCL wire from P0.22 to P0.27
+ *   - Move SDA wire from P0.24 to P0.26
+ *   - Move SCL wire from P1.00 to P0.27
  *   - Keep VDD and GND connected
  *   - Keep pull-ups on the new SDA/SCL lines
  *
  * WHAT TO CHECK:
- *   - If this works but test 03 fails = P0.20/P0.22 pins are damaged
+ *   - If this works but test 03 fails = P0.24/P1.00 pins are damaged
  *     or have conflicting peripherals
  *   - If both fail = not a pin issue
  *
@@ -124,8 +124,8 @@ int main(void)
 	LOG_INF("========================================");
 	LOG_INF("");
 	LOG_INF("!! REWIRE BEFORE THIS TEST !!");
-	LOG_INF("  SDA -> P0.26  (was P0.20)");
-	LOG_INF("  SCL -> P0.27  (was P0.22)");
+	LOG_INF("  SDA -> P0.26  (was P0.24)");
+	LOG_INF("  SCL -> P0.27  (was P1.00)");
 	LOG_INF("  + pull-ups on the new lines");
 	LOG_INF("");
 
@@ -143,7 +143,7 @@ int main(void)
 	int ret = sht40_read_serial(i2c_dev);
 	if (ret == 0) {
 		LOG_INF(">>> SUCCESS on alternate pins! <<<");
-		LOG_INF("If test 03 failed, your P0.20/P0.22 pins may be damaged");
+		LOG_INF("If test 03 failed, your P0.24/P1.00 pins may be damaged");
 		LOG_INF("or have conflicting peripheral assignments.");
 	} else {
 		LOG_ERR(">>> FAILED on alternate pins too <<<");

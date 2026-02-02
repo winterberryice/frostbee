@@ -23,12 +23,13 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
 #include <nrfx_twim.h>
+#include <hal/nrf_gpio.h>
 
 LOG_MODULE_REGISTER(test_07, LOG_LEVEL_INF);
 
 #define SHT40_ADDR  0x44
-#define SDA_PIN     20
-#define SCL_PIN     22
+#define SDA_PIN     NRF_GPIO_PIN_MAP(0, 24)   /* P0.24 */
+#define SCL_PIN     NRF_GPIO_PIN_MAP(1, 0)    /* P1.00 */
 
 #define SHT40_CMD_READ_SERIAL   0x89
 #define SHT40_CMD_MEASURE_HIGH  0xFD
@@ -143,7 +144,7 @@ int main(void)
 	LOG_INF("========================================");
 	LOG_INF("TEST 07: NRFX TWIM Direct");
 	LOG_INF("Bypassing Zephyr I2C driver");
-	LOG_INF("SDA=P0.%d  SCL=P0.%d  ADDR=0x%02X", SDA_PIN, SCL_PIN, SHT40_ADDR);
+	LOG_INF("SDA=P0.24  SCL=P1.00  ADDR=0x%02X", SHT40_ADDR);
 	LOG_INF("========================================");
 
 	if (gpio_is_ready_dt(&led)) {

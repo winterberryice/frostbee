@@ -139,7 +139,7 @@ int main(void)
 
 	LOG_INF("========================================");
 	LOG_INF("TEST 05: Soft Reset Then Read");
-	LOG_INF("SDA=P0.20  SCL=P0.22  ADDR=0x%02X", SHT40_ADDR);
+	LOG_INF("SDA=P0.24  SCL=P1.00  ADDR=0x%02X", SHT40_ADDR);
 	LOG_INF("========================================");
 
 	if (!device_is_ready(i2c_dev)) {

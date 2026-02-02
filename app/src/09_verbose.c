@@ -180,7 +180,7 @@ int main(void)
 
 	LOG_INF("================================================");
 	LOG_INF("TEST 09: Verbose Debug with Retries");
-	LOG_INF("SDA=P0.20  SCL=P0.22");
+	LOG_INF("SDA=P0.24  SCL=P1.00");
 	LOG_INF("This test tries EVERYTHING. Copy all output.");
 	LOG_INF("================================================");
 	LOG_INF("");

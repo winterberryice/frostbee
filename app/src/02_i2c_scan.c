@@ -47,7 +47,7 @@ int main(void)
 	LOG_INF("========================================");
 	LOG_INF("TEST 02: I2C Bus Scan");
 	LOG_INF("Looking for devices on i2c0 (100kHz)");
-	LOG_INF("SDA=P0.20  SCL=P0.22");
+	LOG_INF("SDA=P0.24  SCL=P1.00");
 	LOG_INF("========================================");
 
 	if (!device_is_ready(i2c_dev)) {
@@ -96,7 +96,7 @@ int main(void)
 	if (found == 0) {
 		LOG_WRN(">>> No devices found! <<<");
 		LOG_WRN("Check:");
-		LOG_WRN("  1. Wiring: SDA to P0.20, SCL to P0.22");
+		LOG_WRN("  1. Wiring: SDA to P0.24, SCL to P1.00");
 		LOG_WRN("  2. Pull-ups: 4.7k or 10k to VDD on SDA & SCL");
 		LOG_WRN("  3. Power: SHT40 VDD connected to 3.3V");
 		LOG_WRN("  4. Ground: SHT40 GND connected to nRF GND");
