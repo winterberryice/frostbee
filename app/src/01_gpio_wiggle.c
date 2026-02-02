@@ -29,8 +29,16 @@
 
 LOG_MODULE_REGISTER(test_01, LOG_LEVEL_INF);
 
-#define SDA_PIN  20
-#define SCL_PIN  22
+/*
+ * ┌─────────────────────────────────────────┐
+ * │  CHANGE THESE TO TEST DIFFERENT PINS:   │
+ * │                                         │
+ * │  P0.xx → NRF_GPIO_PIN_MAP(0, xx)       │
+ * │  P1.xx → NRF_GPIO_PIN_MAP(1, xx)       │
+ * └─────────────────────────────────────────┘
+ */
+#define SDA_ABS  NRF_GPIO_PIN_MAP(0, 24)   /* P0.24 */
+#define SCL_ABS  NRF_GPIO_PIN_MAP(1, 0)    /* P1.00 */
 
 /* LED for visual heartbeat */
 #define LED0_NODE DT_ALIAS(led0)
@@ -48,8 +56,8 @@ int main(void)
 	LOG_INF("TEST 01: GPIO Pin Wiggle");
 	LOG_INF("Verify SDA/SCL wiring with multimeter");
 	LOG_INF("========================================");
-	LOG_INF("SDA = P0.%d", SDA_PIN);
-	LOG_INF("SCL = P0.%d", SCL_PIN);
+	LOG_INF("SDA = P%d.%02d (abs %d)", SDA_ABS / 32, SDA_ABS % 32, SDA_ABS);
+	LOG_INF("SCL = P%d.%02d (abs %d)", SCL_ABS / 32, SCL_ABS % 32, SCL_ABS);
 
 	/*
 	 * Disable ALL I2C peripherals and disconnect their pins.
@@ -68,23 +76,22 @@ int main(void)
 
 	/*
 	 * Configure pins using direct nRF register access.
-	 * Bypasses Zephyr GPIO driver entirely — most reliable
-	 * way to reclaim pins from a peripheral.
+	 * nrf_gpio_* functions handle both P0 and P1 ports.
 	 */
-	LOG_INF("Configuring P0.%d and P0.%d as GPIO outputs...", SDA_PIN, SCL_PIN);
+	LOG_INF("Configuring pins as GPIO outputs...");
 
-	nrf_gpio_cfg_output(NRF_GPIO_PIN_MAP(0, SDA_PIN));
-	nrf_gpio_cfg_output(NRF_GPIO_PIN_MAP(0, SCL_PIN));
+	nrf_gpio_cfg_output(SDA_ABS);
+	nrf_gpio_cfg_output(SCL_ABS);
 
 	/* Start both LOW */
-	nrf_gpio_pin_clear(NRF_GPIO_PIN_MAP(0, SDA_PIN));
-	nrf_gpio_pin_clear(NRF_GPIO_PIN_MAP(0, SCL_PIN));
+	nrf_gpio_pin_clear(SDA_ABS);
+	nrf_gpio_pin_clear(SCL_ABS);
 
 	/* Read back to verify */
-	uint32_t sda_out = (NRF_P0->OUT >> SDA_PIN) & 1;
-	uint32_t scl_out = (NRF_P0->OUT >> SCL_PIN) & 1;
-	uint32_t sda_in  = (NRF_P0->IN  >> SDA_PIN) & 1;
-	uint32_t scl_in  = (NRF_P0->IN  >> SCL_PIN) & 1;
+	uint32_t sda_in = nrf_gpio_pin_read(SDA_ABS);
+	uint32_t scl_in = nrf_gpio_pin_read(SCL_ABS);
+	uint32_t sda_out = nrf_gpio_pin_out_read(SDA_ABS);
+	uint32_t scl_out = nrf_gpio_pin_out_read(SCL_ABS);
 
 	LOG_INF("After clear — OUT reg: SDA=%d SCL=%d", sda_out, scl_out);
 	LOG_INF("After clear — IN  reg: SDA=%d SCL=%d", sda_in, scl_in);
@@ -112,16 +119,18 @@ int main(void)
 		state = !state;
 		cycle++;
 
-		/* Toggle using direct register access */
+		/* Toggle using nrf_gpio (handles both P0 and P1) */
 		if (state) {
-			NRF_P0->OUTSET = (1UL << SDA_PIN) | (1UL << SCL_PIN);
+			nrf_gpio_pin_set(SDA_ABS);
+			nrf_gpio_pin_set(SCL_ABS);
 		} else {
-			NRF_P0->OUTCLR = (1UL << SDA_PIN) | (1UL << SCL_PIN);
+			nrf_gpio_pin_clear(SDA_ABS);
+			nrf_gpio_pin_clear(SCL_ABS);
 		}
 
 		/* Read back what the pin actually sees */
-		sda_in = (NRF_P0->IN >> SDA_PIN) & 1;
-		scl_in = (NRF_P0->IN >> SCL_PIN) & 1;
+		sda_in = nrf_gpio_pin_read(SDA_ABS);
+		scl_in = nrf_gpio_pin_read(SCL_ABS);
 
 		if (gpio_is_ready_dt(&led)) {
 			gpio_pin_toggle_dt(&led);
