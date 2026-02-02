@@ -241,8 +241,8 @@ int main(void)
 		uint16_t raw_temp = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
 		uint16_t raw_hum  = ((uint16_t)rx_buf[3] << 8) | rx_buf[4];
 
-		int temp_milli = -45000 + (175000 * (int32_t)raw_temp) / 65535;
-		int hum_milli  = -6000  + (125000 * (int32_t)raw_hum)  / 65535;
+		int temp_milli = -45000 + (int)((175000LL * (int64_t)raw_temp) / 65535);
+		int hum_milli  = -6000  + (int)((125000LL * (int64_t)raw_hum)  / 65535);
 
 		if (hum_milli < 0) hum_milli = 0;
 		if (hum_milli > 100000) hum_milli = 100000;
