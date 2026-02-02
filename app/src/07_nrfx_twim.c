@@ -134,6 +134,12 @@ int main(void)
 {
 	nrfx_err_t err;
 
+	/* Wait for USB serial to connect */
+	for (int i = 10; i > 0; i--) {
+		printk("Starting in %d...\n", i);
+		k_msleep(1000);
+	}
+
 	LOG_INF("========================================");
 	LOG_INF("TEST 07: NRFX TWIM Direct");
 	LOG_INF("Bypassing Zephyr I2C driver");

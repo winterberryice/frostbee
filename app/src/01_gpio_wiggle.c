@@ -40,6 +40,12 @@ int main(void)
 {
 	const struct device *gpio0 = DEVICE_DT_GET(SDA_PORT_NODE);
 
+	/* Wait for USB serial to connect */
+	for (int i = 10; i > 0; i--) {
+		printk("Starting in %d...\n", i);
+		k_msleep(1000);
+	}
+
 	LOG_INF("========================================");
 	LOG_INF("TEST 01: GPIO Pin Wiggle");
 	LOG_INF("Verify SDA/SCL wiring with multimeter");

@@ -38,6 +38,12 @@ int main(void)
 	const struct device *i2c_dev = DEVICE_DT_GET(I2C_NODE);
 	int found = 0;
 
+	/* Wait for USB serial to connect */
+	for (int i = 10; i > 0; i--) {
+		printk("Starting in %d...\n", i);
+		k_msleep(1000);
+	}
+
 	LOG_INF("========================================");
 	LOG_INF("TEST 02: I2C Bus Scan");
 	LOG_INF("Looking for devices on i2c0 (100kHz)");

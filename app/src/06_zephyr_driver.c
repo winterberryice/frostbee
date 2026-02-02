@@ -31,6 +31,12 @@ int main(void)
 {
 	const struct device *sht = DEVICE_DT_GET_ANY(sensirion_sht4x);
 
+	/* Wait for USB serial to connect */
+	for (int i = 10; i > 0; i--) {
+		printk("Starting in %d...\n", i);
+		k_msleep(1000);
+	}
+
 	LOG_INF("========================================");
 	LOG_INF("TEST 06: Zephyr SHT4X Sensor Driver");
 	LOG_INF("Using built-in driver via devicetree");

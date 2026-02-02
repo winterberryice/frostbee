@@ -158,6 +158,12 @@ int main(void)
 {
 	const struct device *i2c_dev = DEVICE_DT_GET(I2C_NODE);
 
+	/* Wait for USB serial to connect */
+	for (int i = 10; i > 0; i--) {
+		printk("Starting in %d...\n", i);
+		k_msleep(1000);
+	}
+
 	LOG_INF("========================================");
 	LOG_INF("TEST 03: Raw I2C at 100kHz");
 	LOG_INF("SDA=P0.20  SCL=P0.22  ADDR=0x%02X", SHT40_ADDR);
