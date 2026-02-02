@@ -23,7 +23,9 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/i2c.h>
 #include <zephyr/logging/log.h>
+#include <nrfx_twim.h>
 
 LOG_MODULE_REGISTER(test_01, LOG_LEVEL_INF);
 
@@ -57,6 +59,17 @@ int main(void)
 		LOG_ERR("GPIO0 port not ready!");
 		return -1;
 	}
+
+	/*
+	 * The I2C (TWIM) driver grabs P0.20/P0.22 at boot.
+	 * We must disable the TWIM peripheral before we can
+	 * use these pins as plain GPIO.
+	 */
+	LOG_INF("Disabling TWIM0 so we can use pins as GPIO...");
+	NRF_TWIM0->ENABLE = 0;
+	/* Also disconnect the pins from the TWIM peripheral */
+	NRF_TWIM0->PSEL.SDA = 0xFFFFFFFF;
+	NRF_TWIM0->PSEL.SCL = 0xFFFFFFFF;
 
 	/* Configure SDA and SCL as plain outputs */
 	gpio_pin_configure(gpio0, SDA_PIN, GPIO_OUTPUT_LOW);
