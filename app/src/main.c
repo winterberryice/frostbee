@@ -128,6 +128,8 @@ int main(void)
 	printk("=========================================\n");
 	printk("  nRF52840 Dongle - All Pin Test\n");
 	printk("=========================================\n");
+	printk("Waiting 10s for console connection...\n");
+	k_msleep(10000);
 	printk("Touch any configured pin to GND.\n");
 	printk("LED toggles + console log on each hit.\n\n");
 
