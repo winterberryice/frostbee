@@ -1,0 +1,76 @@
+menu "SHT40 Test Variants"
+
+choice SHT40_TEST_VARIANT
+	prompt "Select which test variant to build and flash"
+	default TEST_01_GPIO_WIGGLE
+
+config TEST_01_GPIO_WIGGLE
+	bool "Test 01: GPIO pin wiggle (verify wiring)"
+	help
+	  Toggles SDA/SCL pins as plain GPIO outputs.
+	  Use a multimeter or logic analyzer to confirm
+	  the pins are reaching your sensor.
+	  NO I2C is used — purely electrical test.
+
+config TEST_02_I2C_SCAN
+	bool "Test 02: I2C bus scan (find devices)"
+	help
+	  Scans all 127 I2C addresses at 100kHz.
+	  If your SHT40 is wired correctly, you should see
+	  address 0x44 (or 0x45) respond with ACK.
+
+config TEST_03_I2C_RAW_100K
+	bool "Test 03: Raw I2C read at 100kHz"
+	help
+	  Sends the SHT40 'read serial number' command (0x89)
+	  using Zephyr I2C API at standard 100kHz speed.
+	  Prints the serial number bytes on success.
+
+config TEST_04_I2C_RAW_400K
+	bool "Test 04: Raw I2C read at 400kHz"
+	help
+	  Same as test 03 but at 400kHz (fast mode).
+	  If test 03 works but this fails, your wiring
+	  or pull-ups cannot handle fast mode.
+
+config TEST_05_SOFT_RESET
+	bool "Test 05: Soft reset then read"
+	help
+	  Sends a soft-reset command (0x94) to the SHT40,
+	  waits 10ms, then reads serial number.
+	  Useful if sensor is stuck from a previous
+	  interrupted transaction.
+
+config TEST_06_ZEPHYR_DRIVER
+	bool "Test 06: Zephyr SHT4X sensor driver"
+	help
+	  Uses Zephyr's built-in sht4x sensor driver.
+	  This is the 'proper' production approach.
+	  Reads temperature and humidity via sensor API.
+
+config TEST_07_NRFX_TWIM
+	bool "Test 07: NRFX TWIM direct (bypass Zephyr)"
+	help
+	  Uses Nordic's NRFX TWIM HAL directly, bypassing
+	  Zephyr's I2C driver entirely. If this works but
+	  tests 03-06 fail, the issue is in Zephyr's driver.
+
+config TEST_08_ALT_PINS
+	bool "Test 08: Alternate pins P0.26/P0.27"
+	help
+	  Same I2C read as test 03 but on different pins
+	  (P0.26=SDA, P0.27=SCL via i2c1).
+	  Rules out pin-specific hardware issues.
+
+config TEST_09_VERBOSE
+	bool "Test 09: Verbose debug with retries"
+	help
+	  Same as test 03 but with maximum logging,
+	  multiple retries, and detailed error reporting.
+	  Use this to capture exact failure info.
+
+endchoice
+
+endmenu
+
+source "Kconfig.zephyr"
