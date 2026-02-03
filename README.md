@@ -8,8 +8,7 @@ Built with Zephyr RTOS using the Sensirion SHT4X driver.
 
 - **Board:** nRF52840 Dongle (PCA10059)
 - **Sensor:** Sensirion SHT40-AD1B (I2C address 0x44)
-- **Pins:** SDA = P0.24, SCL = P1.00 (100 kHz, external pull-ups required)
-- **LED:** P0.15 (toggles on each reading)
+- **Pins:** SDA = P0.24, SCL = P1.00 (100 kHz)
 
 ## Build & Flash
 
