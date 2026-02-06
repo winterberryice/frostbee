@@ -1,0 +1,34 @@
+# Frostbee - Static Flash Partition Layout
+#
+# nRF52840 Dongle (PCA10059) with UF2 bootloader
+#
+# Protects the bootloader region at the top of flash from being
+# overwritten by ZBOSS NVRAM operations.  Without this file the
+# partition manager may place ZBOSS storage in the bootloader area,
+# bricking the device.
+#
+# Flash map (1 MB):
+#   0x000000 - 0x001000  MBR              (  4 KB)  -- managed by hardware
+#   0x001000 - 0x0e8000  Application      (924 KB)
+#   0x0e8000 - 0x0f0000  ZBOSS NVRAM      ( 32 KB)  -- Zigbee network data
+#   0x0f0000 - 0x0f4000  ZBOSS product cfg( 16 KB)  -- Zigbee product config
+#   0x0f4000 - 0x100000  Bootloader       ( 48 KB)  -- DO NOT TOUCH
+#
+
+app:
+  address: 0x1000
+  end_address: 0xe8000
+  region: flash_primary
+  size: 0xe7000
+
+zboss_nvram:
+  address: 0xe8000
+  end_address: 0xf0000
+  region: flash_primary
+  size: 0x8000
+
+zboss_product_config:
+  address: 0xf0000
+  end_address: 0xf4000
+  region: flash_primary
+  size: 0x4000
