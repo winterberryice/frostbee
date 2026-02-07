@@ -26,7 +26,7 @@
 LOG_MODULE_REGISTER(frostbee, LOG_LEVEL_INF);
 
 /* Sensor read interval in seconds (used for ZBOSS alarm scheduling). */
-#define SENSOR_READ_INTERVAL_S  600
+#define SENSOR_READ_INTERVAL_S  10  /* 10s for dev, 600s for production */
 
 /* Erase NVRAM on every boot so the device rejoins the network.
  * Safe for development — no stale network state, and combined with
@@ -256,7 +256,7 @@ static void sensor_read_and_update(zb_bufid_t bufid)
 		ZB_ZCL_CLUSTER_SERVER_ROLE,
 		ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID,
 		(zb_uint8_t *)&temp_zcl,
-		ZB_FALSE);
+		ZB_TRUE);
 
 	ZB_ZCL_SET_ATTRIBUTE(
 		FROSTBEE_ENDPOINT,
@@ -264,7 +264,7 @@ static void sensor_read_and_update(zb_bufid_t bufid)
 		ZB_ZCL_CLUSTER_SERVER_ROLE,
 		ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_VALUE_ID,
 		(zb_uint8_t *)&hum_zcl,
-		ZB_FALSE);
+		ZB_TRUE);
 
 reschedule:
 	ZB_SCHEDULE_APP_ALARM(sensor_read_and_update, 0,

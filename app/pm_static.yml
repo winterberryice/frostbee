@@ -10,13 +10,15 @@
 #   -DPM_STATIC_YML_FILE=pm_static_release.yml
 #
 # Flash map (1 MB):
-#   0x000000 - 0x001000  MBR              (  4 KB)  -- managed by hardware
-#   0x001000 - 0x0d8000  Application      (860 KB)
-#   0x0d8000 - 0x100000  Bootloader       (160 KB)  -- DO NOT TOUCH
+#   0x000000 - 0x001000  MBR              (  4 KB)  -- auto by partition manager
+#   0x001000 - 0x0d8000  Application      (860 KB)  -- auto (fills the gap)
+#   0x0d8000 - 0x100000  Bootloader       (160 KB)  -- RESERVED below
 #
+# NOTE: 'app' is placed automatically by partition manager in the
+# single remaining gap between MBR and bootloader_reserved.
 
-app:
-  address: 0x1000
-  end_address: 0xd8000
+bootloader_reserved:
+  address: 0xd8000
+  end_address: 0x100000
   region: flash_primary
-  size: 0xd7000
+  size: 0x28000
