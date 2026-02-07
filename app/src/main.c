@@ -28,8 +28,13 @@ LOG_MODULE_REGISTER(frostbee, LOG_LEVEL_INF);
 /* Sensor read interval in seconds (used for ZBOSS alarm scheduling). */
 #define SENSOR_READ_INTERVAL_S  600
 
-/* Do not erase NVRAM to preserve network parameters across reboots. */
-#define ERASE_PERSISTENT_CONFIG ZB_FALSE
+/* Erase NVRAM on every boot so the device rejoins the network.
+ * Safe for development — no stale network state, and combined with
+ * the dev pm_static.yml (no NVRAM partitions) the Zigbee stack
+ * has nowhere to write persistent data.
+ * Change to ZB_FALSE (and use pm_static_release.yml) for production.
+ */
+#define ERASE_PERSISTENT_CONFIG ZB_TRUE
 
 /* Basic cluster metadata */
 #define FROSTBEE_INIT_BASIC_APP_VERSION    1

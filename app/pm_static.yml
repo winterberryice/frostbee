@@ -1,43 +1,22 @@
-# Frostbee - Static Flash Partition Layout
+# Frostbee - Development Flash Partition Layout
 #
 # nRF52840 Dongle (PCA10059) with UF2 bootloader
 #
-# Protects the bootloader region at the top of flash from being
-# overwritten by ZBOSS NVRAM operations.  Without this file the
-# partition manager may place ZBOSS storage in the bootloader area,
-# bricking the device.
+# NO ZBOSS NVRAM partitions — the Zigbee stack cannot write to flash,
+# so it cannot corrupt the bootloader.  The device will rejoin the
+# network on every boot, which is fine for development.
 #
-# The reserved bootloader region (128 KB) is deliberately oversized
-# to be safe regardless of which bootloader variant is installed
-# (Nordic Open Bootloader, Adafruit UF2, etc.).  After recovery,
-# check the actual bootloader start address:
-#
-#   nrfjprog --memrd 0x10001014   (reads UICR.BOOTLOADERADDR)
-#
-# Then you can shrink the reserved region and reclaim flash for the app.
+# For production builds with persistent Zigbee storage, use:
+#   -DPM_STATIC_YML_FILE=pm_static_release.yml
 #
 # Flash map (1 MB):
 #   0x000000 - 0x001000  MBR              (  4 KB)  -- managed by hardware
-#   0x001000 - 0x0cc000  Application      (812 KB)
-#   0x0cc000 - 0x0d4000  ZBOSS NVRAM      ( 32 KB)  -- Zigbee network data
-#   0x0d4000 - 0x0d8000  ZBOSS product cfg( 16 KB)  -- Zigbee product config
+#   0x001000 - 0x0d8000  Application      (860 KB)
 #   0x0d8000 - 0x100000  Bootloader       (160 KB)  -- DO NOT TOUCH
 #
 
 app:
   address: 0x1000
-  end_address: 0xcc000
-  region: flash_primary
-  size: 0xcb000
-
-zboss_nvram:
-  address: 0xcc000
-  end_address: 0xd4000
-  region: flash_primary
-  size: 0x8000
-
-zboss_product_config:
-  address: 0xd4000
   end_address: 0xd8000
   region: flash_primary
-  size: 0x4000
+  size: 0xd7000
