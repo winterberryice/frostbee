@@ -17,7 +17,7 @@ ZMIANY DO COFNIĘCIA DLA PRODUKCJI
 
 3. [main.c:253,260] Wymuszanie raportów ZCL
    Dev:  ZB_TRUE (zawsze wysyłaj raport)
-   Prod: Rozważyć ZB_FALSE + konfiguracja raportowania przez koordynator
+   Prod: Rozważyć optymalizację (patrz sekcja RAPORTOWANIE ZCL poniżej)
 
 4. [pm_static.yml] Partycje flash
    Dev:  pm_static.yml (bez ZBOSS NVRAM - zero zapisów do flash)
@@ -53,6 +53,33 @@ Produkcja (gdy gotowe):
   west build -b nrf52840dongle/nrf52840 app -- \
     -DOVERLAY_CONFIG=prj_release.conf \
     -DPM_STATIC_YML_FILE=pm_static_release.yml
+
+
+RAPORTOWANIE ZCL - OPCJE DO ROZWAŻENIA
+--------------------------------------
+
+Problem: ZB_FALSE nie wysyła raportów - wartości są w pamięci, ale koordynator
+ich nie dostaje (Z2M nie polluje sleepy end devices).
+
+Opcja 1: ZB_TRUE (obecne rozwiązanie)
+  + Proste, działa od razu
+  + Przy 600s interwale = 144 raporty/dzień, minimalne zużycie baterii
+  - Zawsze wysyła raport, nawet gdy wartość się nie zmieniła
+
+Opcja 2: Konfiguracja raportowania przez koordynator
+  - Z2M wysyła Configure Reporting do urządzenia
+  - Urządzenie samo raportuje co min/max sekund gdy wartość zmieni się o próg
+  - Wymaga poprawnej deklaracji atrybutów jako reportable w firmware
+  - Bardziej zgodne ze specyfikacją ZCL
+
+Opcja 3: Ręczne raportowanie z progiem (zb_zcl_report_attr)
+  - Sprawdzać czy wartość zmieniła się o np. 0.5°C / 2% RH
+  - Jeśli tak - wywołać zb_zcl_report_attr() ręcznie
+  - Najefektywniejsze dla baterii
+  - Wymaga więcej kodu
+
+Rekomendacja: Dla v1.0 zostaw ZB_TRUE z 600s interwałem. Optymalizuj później
+jeśli bateria będzie problemem.
 
 
 NOTATKI

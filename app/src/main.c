@@ -256,7 +256,7 @@ static void sensor_read_and_update(zb_bufid_t bufid)
 		ZB_ZCL_CLUSTER_SERVER_ROLE,
 		ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID,
 		(zb_uint8_t *)&temp_zcl,
-		ZB_TRUE);
+		ZB_FALSE);
 
 	ZB_ZCL_SET_ATTRIBUTE(
 		FROSTBEE_ENDPOINT,
@@ -264,7 +264,7 @@ static void sensor_read_and_update(zb_bufid_t bufid)
 		ZB_ZCL_CLUSTER_SERVER_ROLE,
 		ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_VALUE_ID,
 		(zb_uint8_t *)&hum_zcl,
-		ZB_TRUE);
+		ZB_FALSE);
 
 reschedule:
 	ZB_SCHEDULE_APP_ALARM(sensor_read_and_update, 0,
