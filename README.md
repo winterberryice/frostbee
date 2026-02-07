@@ -41,18 +41,23 @@ Disables logging/serial and enables RAM power-down for lower idle current.
 ## Flash Partitioning
 
 `app/pm_static.yml` defines a safe flash layout that keeps ZBOSS NVRAM
-away from the bootloader region:
+away from the bootloader region.  The reserved bootloader area (160 KB)
+is deliberately oversized to be safe regardless of bootloader variant:
 
 ```
 0x000000 - 0x001000  MBR              (  4 KB)
-0x001000 - 0x0e8000  Application      (924 KB)
-0x0e8000 - 0x0f0000  ZBOSS NVRAM      ( 32 KB)
-0x0f0000 - 0x0f4000  ZBOSS product cfg( 16 KB)
-0x0f4000 - 0x100000  Bootloader       ( 48 KB)  ← protected
+0x001000 - 0x0cc000  Application      (812 KB)
+0x0cc000 - 0x0d4000  ZBOSS NVRAM      ( 32 KB)
+0x0d4000 - 0x0d8000  ZBOSS product cfg( 16 KB)
+0x0d8000 - 0x100000  Bootloader       (160 KB)  ← protected
 ```
 
-If your UF2 bootloader starts at a different address, adjust
-`pm_static.yml` accordingly.
+After SWD recovery, you can check the actual bootloader start address
+and shrink the reserved region to reclaim flash:
+
+```
+nrfjprog --memrd 0x10001014   # reads UICR.BOOTLOADERADDR
+```
 
 ## Recovery (bricked dongle)
 
