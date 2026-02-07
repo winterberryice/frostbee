@@ -1,0 +1,65 @@
+Frostbee - Zigbee TODO
+=======================
+
+Status: Dev działa, produkcja wymaga dopracowania
+
+
+ZMIANY DO COFNIĘCIA DLA PRODUKCJI
+---------------------------------
+
+1. [main.c:29] Interwał odczytu sensora
+   Dev:  SENSOR_READ_INTERVAL_S = 10
+   Prod: SENSOR_READ_INTERVAL_S = 600
+
+2. [main.c:37] Kasowanie NVRAM przy starcie
+   Dev:  ERASE_PERSISTENT_CONFIG = ZB_TRUE  (kasuj, rejoin przy każdym bocie)
+   Prod: ERASE_PERSISTENT_CONFIG = ZB_FALSE (zachowaj dane sieci)
+
+3. [main.c:253,260] Wymuszanie raportów ZCL
+   Dev:  ZB_TRUE (zawsze wysyłaj raport)
+   Prod: Rozważyć ZB_FALSE + konfiguracja raportowania przez koordynator
+
+4. [pm_static.yml] Partycje flash
+   Dev:  pm_static.yml (bez ZBOSS NVRAM - zero zapisów do flash)
+   Prod: pm_static_release.yml (z ZBOSS NVRAM dla persystencji)
+
+5. [prj.conf] RAM power down
+   Dev:  CONFIG_RAM_POWER_DOWN_LIBRARY wyłączone (bezpieczne dla bootloadera)
+   Prod: prj_release.conf z CONFIG_RAM_POWER_DOWN_LIBRARY=y
+
+6. [prj.conf] Logi/Serial
+   Dev:  CONFIG_LOG=y, CONFIG_SERIAL=y (debug)
+   Prod: prj_release.conf z CONFIG_LOG=n, CONFIG_SERIAL=n (oszczędność baterii)
+
+
+BRAKUJĄCE FUNKCJE
+-----------------
+
+[ ] Bateria - atrybut batteryPercentageRemaining
+    - Zigbee2MQTT próbuje skonfigurować raportowanie ale dostaje UNSUPPORTED_ATTRIBUTE
+    - Trzeba dodać atrybut do ZB_ZCL_DECLARE_POWER_CONFIG_ATTRIB_LIST w main.c
+    - Obecnie zadeklarowane: battery_voltage, battery_size, battery_quantity,
+      battery_rated_voltage, battery_alarm_mask, battery_voltage_min_threshold
+    - Brakuje: battery_percentage (batteryPercentageRemaining, attr ID 0x0021)
+
+
+JAK BUDOWAĆ
+-----------
+
+Development (domyślne):
+  west build -b nrf52840dongle/nrf52840 app
+
+Produkcja (gdy gotowe):
+  west build -b nrf52840dongle/nrf52840 app -- \
+    -DOVERLAY_CONFIG=prj_release.conf \
+    -DPM_STATIC_YML_FILE=pm_static_release.yml
+
+
+NOTATKI
+-------
+
+- Bootloader UF2 jest chroniony w regionie 0xd8000-0x100000 (160 KB reserved)
+- Kanał Zigbee: multi-channel scan (CONFIG_ZIGBEE_CHANNEL_SELECTION_MODE_MULTI=y)
+- Device ID: ZB_HA_TEMPERATURE_SENSOR_DEVICE_ID
+- Endpoint: 1
+- Manufacturer: "Frostbee", Model: "FBE_TH_1"
