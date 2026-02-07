@@ -1,4 +1,8 @@
 / {
+	chosen {
+		ncs,zigbee-timer = &timer2;
+	};
+
 	leds {
 		compatible = "gpio-leds";
 		led0_green: led_0 {
@@ -43,4 +47,8 @@
 			low-power-enable;
 		};
 	};
+};
+
+&timer2 {
+	status = "okay";
 };
