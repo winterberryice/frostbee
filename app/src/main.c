@@ -244,7 +244,7 @@ static void clusters_attr_init(void)
 
 	/* Power configuration — AA batteries */
 	dev_ctx.battery_voltage = 30;  /* 3.0V in units of 100mV */
-	dev_ctx.battery_percentage = 200; /* 100% (ZCL uses 0.5% units, so 200 = 100%) */
+	dev_ctx.battery_percentage = 164; /* 82% (ZCL uses 0.5% units, so 164 = 82%) */
 	dev_ctx.battery_size = ZB_ZCL_POWER_CONFIG_BATTERY_SIZE_AA;
 	dev_ctx.battery_quantity = 2;
 	dev_ctx.battery_rated_voltage = 15; /* 1.5V per cell in units of 100mV */
@@ -299,9 +299,10 @@ static void sensor_read_and_update(zb_bufid_t bufid)
 		temp.val1, temp.val2 / 10000, temp_zcl,
 		hum.val1, hum.val2 / 10000, hum_zcl);
 
-	/* Update ZCL attributes — the ZBOSS reporting engine will
-	 * automatically send reports if the value changed enough
-	 * (per the coordinator's Configure Reporting settings).
+	/* Update ZCL attributes — ZB_FALSE just stores the value.
+	 * The ZBOSS reporting engine sends reports automatically
+	 * based on the coordinator's Configure Reporting thresholds
+	 * (min/max interval, reportable change).
 	 */
 	ZB_ZCL_SET_ATTRIBUTE(
 		FROSTBEE_ENDPOINT,
@@ -309,7 +310,7 @@ static void sensor_read_and_update(zb_bufid_t bufid)
 		ZB_ZCL_CLUSTER_SERVER_ROLE,
 		ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID,
 		(zb_uint8_t *)&temp_zcl,
-		ZB_TRUE);
+		ZB_FALSE);
 
 	ZB_ZCL_SET_ATTRIBUTE(
 		FROSTBEE_ENDPOINT,
@@ -317,16 +318,16 @@ static void sensor_read_and_update(zb_bufid_t bufid)
 		ZB_ZCL_CLUSTER_SERVER_ROLE,
 		ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_VALUE_ID,
 		(zb_uint8_t *)&hum_zcl,
-		ZB_TRUE);
+		ZB_FALSE);
 
-	/* Report battery percentage (static 100% for now - TODO: read actual voltage) */
+	/* Battery percentage: static 82% for now (TODO: read actual voltage) */
 	ZB_ZCL_SET_ATTRIBUTE(
 		FROSTBEE_ENDPOINT,
 		ZB_ZCL_CLUSTER_ID_POWER_CONFIG,
 		ZB_ZCL_CLUSTER_SERVER_ROLE,
 		ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_ID,
 		(zb_uint8_t *)&dev_ctx.battery_percentage,
-		ZB_TRUE);
+		ZB_FALSE);
 
 reschedule:
 	ZB_SCHEDULE_APP_ALARM(sensor_read_and_update, 0,

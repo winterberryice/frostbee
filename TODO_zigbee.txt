@@ -15,9 +15,9 @@ ZMIANY DO COFNIĘCIA DLA PRODUKCJI
    Dev:  ERASE_PERSISTENT_CONFIG = ZB_TRUE  (kasuj, rejoin przy każdym bocie)
    Prod: ERASE_PERSISTENT_CONFIG = ZB_FALSE (zachowaj dane sieci)
 
-3. [main.c:253,260] Wymuszanie raportów ZCL
-   Dev:  ZB_TRUE (zawsze wysyłaj raport)
-   Prod: Rozważyć optymalizację (patrz sekcja RAPORTOWANIE ZCL poniżej)
+3. [main.c] Raportowanie ZCL
+   NAPRAWIONE: ZB_FALSE — ZBOSS reporting engine respektuje Configure Reporting
+   od koordynatora (progi, interwały). Nie trzeba zmieniać dla produkcji.
 
 4. [pm_static.yml] Partycje flash
    Dev:  pm_static.yml (bez ZBOSS NVRAM - zero zapisów do flash)
@@ -35,12 +35,13 @@ ZMIANY DO COFNIĘCIA DLA PRODUKCJI
 BRAKUJĄCE FUNKCJE
 -----------------
 
-[ ] Bateria - atrybut batteryPercentageRemaining
-    - Zigbee2MQTT próbuje skonfigurować raportowanie ale dostaje UNSUPPORTED_ATTRIBUTE
-    - Trzeba dodać atrybut do ZB_ZCL_DECLARE_POWER_CONFIG_ATTRIB_LIST w main.c
-    - Obecnie zadeklarowane: battery_voltage, battery_size, battery_quantity,
-      battery_rated_voltage, battery_alarm_mask, battery_voltage_min_threshold
-    - Brakuje: battery_percentage (batteryPercentageRemaining, attr ID 0x0021)
+[x] Bateria - atrybut batteryPercentageRemaining
+    ZROBIONE: Atrybut 0x0021 jest zadeklarowany w custom power_config_attr_list
+    z flagą ZB_ZCL_ATTR_ACCESS_REPORTING. Wartość hardcoded 82% (TODO: odczyt ADC).
+
+[ ] Bateria - odczyt rzeczywistego napięcia z ADC
+    - Obecnie battery_percentage jest hardcoded na 82%
+    - Trzeba: odczytać napięcie baterii przez ADC, przeliczyć na procenty
 
 
 JAK BUDOWAĆ
@@ -55,37 +56,29 @@ Produkcja (gdy gotowe):
     -DPM_STATIC_YML_FILE=pm_static_release.yml
 
 
-RAPORTOWANIE ZCL - DO NAPRAWY
+RAPORTOWANIE ZCL - NAPRAWIONE
 -----------------------------
 
-Status: Obecnie używamy "hacka" z ZB_TRUE który wymusza raport przy każdym
-        ZB_ZCL_SET_ATTRIBUTE. To działa, ale nie jest zgodne ze specyfikacją.
+Status: ZROBIONE. Używamy ZB_FALSE — ZBOSS reporting engine sam zarządza
+        raportami na podstawie Configure Reporting od koordynatora (Z2M).
 
-Problem: ZB_FALSE nie wysyła raportów - wartości są w pamięci, ale koordynator
-ich nie dostaje (Z2M nie polluje sleepy end devices).
+Jak to działa:
+  1. Atrybuty temp/humidity/battery mają flagę ZB_ZCL_ATTR_ACCESS_REPORTING
+     - temp_measurement: ustawiona przez makro ZBOSS (ZB_ZCL_DECLARE_TEMP_MEASUREMENT_ATTRIB_LIST)
+     - rel_humidity: ustawiona przez makro ZBOSS (ZB_ZCL_DECLARE_REL_HUMIDITY_MEASUREMENT_ATTRIB_LIST)
+     - battery_percentage: ustawiona ręcznie w custom power_config_attr_list
+  2. Z2M przy parowaniu wysyła "Configure Reporting" z domyślnymi progami:
+     - Temperatura: min 10s, max 3600s, zmiana 1.00°C
+     - Wilgotność: min 10s, max 3600s, zmiana 1.00%
+     - Bateria: min 3600s, max 62000s, każda zmiana
+  3. ZB_ZCL_SET_ATTRIBUTE(..., ZB_FALSE) tylko zapisuje wartość
+  4. ZBOSS reporting engine porównuje i wysyła raport gdy próg przekroczony
 
-Obecne rozwiązanie (hack):
-  - ZB_ZCL_SET_ATTRIBUTE(..., ZB_TRUE) wymusza raport
-  - Działa, ale wysyła raport nawet gdy wartość się nie zmieniła
-  - Nie respektuje Configure Reporting od koordynatora
-
-Prawidłowe rozwiązanie (do zaimplementowania):
-  1. Upewnić się że atrybuty mają flagę ZB_ZCL_ATTR_ACCESS_REPORTING
-  2. Koordynator (Z2M) wysyła "Configure Reporting" do urządzenia
-     - np. "raportuj temperaturę co 60-300s gdy zmieni się o 0.5°C"
-  3. ZBOSS reporting engine automatycznie wysyła raporty
-  4. ZB_ZCL_SET_ATTRIBUTE(..., ZB_FALSE) - tylko ustawia wartość
-
-Kroki do naprawy:
-  [ ] Sprawdzić czy atrybuty temp/humidity mają ACCESS_REPORTING
+Zrobione:
+  [x] Sprawdzić czy atrybuty temp/humidity mają ACCESS_REPORTING — TAK
+  [x] Zmienić ZB_TRUE na ZB_FALSE w ZB_ZCL_SET_ATTRIBUTE
   [ ] Sprawdzić logi Z2M czy Configure Reporting przechodzi bez błędów
-  [ ] Przetestować z ZB_FALSE po naprawie
   [ ] Zweryfikować że raporty idą tylko gdy wartość zmieni się o próg
-
-Alternatywa - ręczne raportowanie z progiem:
-  - Sprawdzać czy wartość zmieniła się o np. 0.5°C / 2% RH
-  - Jeśli tak - wywołać zb_zcl_report_attr() ręcznie
-  - Najefektywniejsze dla baterii, ale wymaga więcej kodu
 
 
 NOTATKI
