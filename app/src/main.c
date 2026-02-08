@@ -355,6 +355,15 @@ void zboss_signal_handler(zb_bufid_t bufid)
 		}
 		break;
 
+	case ZB_ZDO_SIGNAL_PRODUCTION_CONFIG_READY:
+		/* Production config partition is empty - this is normal,
+		 * we don't use install codes or pre-shared keys. */
+		break;
+
+	case ZB_SIGNAL_JOIN_DONE:
+		/* Certification testing signal - ignore. */
+		break;
+
 	default:
 		ZB_ERROR_CHECK(zigbee_default_signal_handler(bufid));
 		break;
