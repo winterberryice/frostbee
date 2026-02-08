@@ -55,31 +55,37 @@ Produkcja (gdy gotowe):
     -DPM_STATIC_YML_FILE=pm_static_release.yml
 
 
-RAPORTOWANIE ZCL - OPCJE DO ROZWAŻENIA
---------------------------------------
+RAPORTOWANIE ZCL - DO NAPRAWY
+-----------------------------
+
+Status: Obecnie używamy "hacka" z ZB_TRUE który wymusza raport przy każdym
+        ZB_ZCL_SET_ATTRIBUTE. To działa, ale nie jest zgodne ze specyfikacją.
 
 Problem: ZB_FALSE nie wysyła raportów - wartości są w pamięci, ale koordynator
 ich nie dostaje (Z2M nie polluje sleepy end devices).
 
-Opcja 1: ZB_TRUE (obecne rozwiązanie)
-  + Proste, działa od razu
-  + Przy 600s interwale = 144 raporty/dzień, minimalne zużycie baterii
-  - Zawsze wysyła raport, nawet gdy wartość się nie zmieniła
+Obecne rozwiązanie (hack):
+  - ZB_ZCL_SET_ATTRIBUTE(..., ZB_TRUE) wymusza raport
+  - Działa, ale wysyła raport nawet gdy wartość się nie zmieniła
+  - Nie respektuje Configure Reporting od koordynatora
 
-Opcja 2: Konfiguracja raportowania przez koordynator
-  - Z2M wysyła Configure Reporting do urządzenia
-  - Urządzenie samo raportuje co min/max sekund gdy wartość zmieni się o próg
-  - Wymaga poprawnej deklaracji atrybutów jako reportable w firmware
-  - Bardziej zgodne ze specyfikacją ZCL
+Prawidłowe rozwiązanie (do zaimplementowania):
+  1. Upewnić się że atrybuty mają flagę ZB_ZCL_ATTR_ACCESS_REPORTING
+  2. Koordynator (Z2M) wysyła "Configure Reporting" do urządzenia
+     - np. "raportuj temperaturę co 60-300s gdy zmieni się o 0.5°C"
+  3. ZBOSS reporting engine automatycznie wysyła raporty
+  4. ZB_ZCL_SET_ATTRIBUTE(..., ZB_FALSE) - tylko ustawia wartość
 
-Opcja 3: Ręczne raportowanie z progiem (zb_zcl_report_attr)
+Kroki do naprawy:
+  [ ] Sprawdzić czy atrybuty temp/humidity mają ACCESS_REPORTING
+  [ ] Sprawdzić logi Z2M czy Configure Reporting przechodzi bez błędów
+  [ ] Przetestować z ZB_FALSE po naprawie
+  [ ] Zweryfikować że raporty idą tylko gdy wartość zmieni się o próg
+
+Alternatywa - ręczne raportowanie z progiem:
   - Sprawdzać czy wartość zmieniła się o np. 0.5°C / 2% RH
   - Jeśli tak - wywołać zb_zcl_report_attr() ręcznie
-  - Najefektywniejsze dla baterii
-  - Wymaga więcej kodu
-
-Rekomendacja: Dla v1.0 zostaw ZB_TRUE z 600s interwałem. Optymalizuj później
-jeśli bateria będzie problemem.
+  - Najefektywniejsze dla baterii, ale wymaga więcej kodu
 
 
 NOTATKI

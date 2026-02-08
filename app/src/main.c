@@ -109,14 +109,67 @@ ZB_ZCL_DECLARE_IDENTIFY_SERVER_ATTRIB_LIST(
 	identify_server_attr_list,
 	&dev_ctx.identify_attr.identify_time);
 
-ZB_ZCL_DECLARE_POWER_CONFIG_ATTRIB_LIST(
-	power_config_attr_list,
-	&dev_ctx.battery_voltage,
-	&dev_ctx.battery_size,
-	&dev_ctx.battery_quantity,
-	&dev_ctx.battery_rated_voltage,
-	&dev_ctx.battery_alarm_mask,
-	&dev_ctx.battery_voltage_min_threshold);
+/* Custom power config attribute list with batteryPercentageRemaining
+ * Using raw attribute descriptors since ZBOSS macros require bat_num suffix
+ */
+zb_zcl_attr_t power_config_attr_list[] = {
+	{
+		ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID,
+		ZB_ZCL_ATTR_TYPE_U8,
+		ZB_ZCL_ATTR_ACCESS_READ_ONLY,
+		(ZB_ZCL_NON_MANUFACTURER_SPECIFIC),
+		(void *)&dev_ctx.battery_voltage
+	},
+	{
+		ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_ID,
+		ZB_ZCL_ATTR_TYPE_U8,
+		ZB_ZCL_ATTR_ACCESS_READ_ONLY | ZB_ZCL_ATTR_ACCESS_REPORTING,
+		(ZB_ZCL_NON_MANUFACTURER_SPECIFIC),
+		(void *)&dev_ctx.battery_percentage
+	},
+	{
+		ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_SIZE_ID,
+		ZB_ZCL_ATTR_TYPE_8BIT_ENUM,
+		ZB_ZCL_ATTR_ACCESS_READ_ONLY,
+		(ZB_ZCL_NON_MANUFACTURER_SPECIFIC),
+		(void *)&dev_ctx.battery_size
+	},
+	{
+		ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_QUANTITY_ID,
+		ZB_ZCL_ATTR_TYPE_U8,
+		ZB_ZCL_ATTR_ACCESS_READ_ONLY,
+		(ZB_ZCL_NON_MANUFACTURER_SPECIFIC),
+		(void *)&dev_ctx.battery_quantity
+	},
+	{
+		ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_RATED_VOLTAGE_ID,
+		ZB_ZCL_ATTR_TYPE_U8,
+		ZB_ZCL_ATTR_ACCESS_READ_ONLY,
+		(ZB_ZCL_NON_MANUFACTURER_SPECIFIC),
+		(void *)&dev_ctx.battery_rated_voltage
+	},
+	{
+		ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_ALARM_MASK_ID,
+		ZB_ZCL_ATTR_TYPE_8BITMAP,
+		ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+		(ZB_ZCL_NON_MANUFACTURER_SPECIFIC),
+		(void *)&dev_ctx.battery_alarm_mask
+	},
+	{
+		ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_MIN_THRESHOLD_ID,
+		ZB_ZCL_ATTR_TYPE_U8,
+		ZB_ZCL_ATTR_ACCESS_READ_WRITE,
+		(ZB_ZCL_NON_MANUFACTURER_SPECIFIC),
+		(void *)&dev_ctx.battery_voltage_min_threshold
+	},
+	{
+		ZB_ZCL_NULL_ID,
+		0,
+		0,
+		(ZB_ZCL_NON_MANUFACTURER_SPECIFIC),
+		NULL
+	}
+};
 
 ZB_ZCL_DECLARE_TEMP_MEASUREMENT_ATTRIB_LIST(
 	temp_measurement_attr_list,
@@ -256,7 +309,7 @@ static void sensor_read_and_update(zb_bufid_t bufid)
 		ZB_ZCL_CLUSTER_SERVER_ROLE,
 		ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID,
 		(zb_uint8_t *)&temp_zcl,
-		ZB_FALSE);
+		ZB_TRUE);
 
 	ZB_ZCL_SET_ATTRIBUTE(
 		FROSTBEE_ENDPOINT,
@@ -264,7 +317,16 @@ static void sensor_read_and_update(zb_bufid_t bufid)
 		ZB_ZCL_CLUSTER_SERVER_ROLE,
 		ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_VALUE_ID,
 		(zb_uint8_t *)&hum_zcl,
-		ZB_FALSE);
+		ZB_TRUE);
+
+	/* Report battery percentage (static 100% for now - TODO: read actual voltage) */
+	ZB_ZCL_SET_ATTRIBUTE(
+		FROSTBEE_ENDPOINT,
+		ZB_ZCL_CLUSTER_ID_POWER_CONFIG,
+		ZB_ZCL_CLUSTER_SERVER_ROLE,
+		ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_ID,
+		(zb_uint8_t *)&dev_ctx.battery_percentage,
+		ZB_TRUE);
 
 reschedule:
 	ZB_SCHEDULE_APP_ALARM(sensor_read_and_update, 0,
