@@ -1,0 +1,29 @@
+Frostbee - Battery Optimization TODO
+=====================================
+
+Status: Na później, gdy masz dostęp SWD do recovery
+
+
+OPTYMALIZACJE DO WŁĄCZENIA
+--------------------------
+
+[ ] Wyłączyć logi: CONFIG_LOG=n
+    Plik: prj.conf
+    Oszczędność: ~5-10 µA (mniej CPU cycles na formatowanie)
+
+[ ] Wyłączyć serial: CONFIG_SERIAL=n, CONFIG_CONSOLE=n, CONFIG_UART_CONSOLE=n, CONFIG_UART_INTERRUPT_DRIVEN=n
+    Plik: prj.conf
+    Oszczędność: ~10-20 µA (UART idle current)
+
+[ ] RAM power down: CONFIG_RAM_POWER_DOWN_LIBRARY=y
+    Plik: prj.conf
+    Oszczędność: ~10 µA (wyłączanie nieużywanych banków RAM podczas sleep)
+    UWAGA: Psuje wykrywanie double-tap reset w bootloaderze UF2!
+
+
+NOTATKI
+-------
+
+- Wszystkie te opcje wymagają dostępu SWD/J-Link do recovery
+- CONFIG_RAM_POWER_DOWN_LIBRARY blokuje bootloader UF2 (double-tap nie działa)
+- Łączna oszczędność: ~25-40 µA w idle

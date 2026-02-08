@@ -28,13 +28,11 @@ LOG_MODULE_REGISTER(frostbee, LOG_LEVEL_INF);
 /* Sensor read interval in seconds (used for ZBOSS alarm scheduling). */
 #define SENSOR_READ_INTERVAL_S  10  /* 10s for dev, 600s for production */
 
-/* Erase NVRAM on every boot so the device rejoins the network.
- * Safe for development — no stale network state, and combined with
- * the dev pm_static.yml (no NVRAM partitions) the Zigbee stack
- * has nowhere to write persistent data.
- * Change to ZB_FALSE (and use pm_static_release.yml) for production.
+/* Keep Zigbee network data across reboots.
+ * Device remembers paired network - no rejoin needed after restart.
+ * To force rejoin: erase NVRAM via nrfjprog or flash with ZB_TRUE temporarily.
  */
-#define ERASE_PERSISTENT_CONFIG ZB_TRUE
+#define ERASE_PERSISTENT_CONFIG ZB_FALSE
 
 /* Basic cluster metadata */
 #define FROSTBEE_INIT_BASIC_APP_VERSION    1

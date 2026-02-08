@@ -1,21 +1,37 @@
-# Frostbee - Development Flash Partition Layout
+# Frostbee - Flash Partition Layout
 #
 # nRF52840 Dongle (PCA10059) with UF2 bootloader
 #
-# NO ZBOSS NVRAM partitions — the Zigbee stack cannot write to flash,
-# so it cannot corrupt the bootloader.  The device will rejoin the
-# network on every boot, which is fine for development.
-#
-# For production builds with persistent Zigbee storage, use:
-#   -DPM_STATIC_YML_FILE=pm_static_release.yml
+# Includes ZBOSS NVRAM partitions for persistent Zigbee storage,
+# placed safely below the bootloader region.
 #
 # Flash map (1 MB):
-#   0x000000 - 0x001000  MBR              (  4 KB)  -- auto by partition manager
-#   0x001000 - 0x0d8000  Application      (860 KB)  -- auto (fills the gap)
-#   0x0d8000 - 0x100000  Bootloader       (160 KB)  -- RESERVED below
+#   0x000000 - 0x001000  MBR              (  4 KB)  -- managed by hardware
+#   0x001000 - 0x0cc000  Application      (812 KB)
+#   0x0cc000 - 0x0d4000  ZBOSS NVRAM      ( 32 KB)  -- Zigbee network data
+#   0x0d4000 - 0x0d8000  ZBOSS product cfg( 16 KB)  -- Zigbee product config
+#   0x0d8000 - 0x100000  Bootloader       (160 KB)  -- DO NOT TOUCH
 #
 # NOTE: 'app' is placed automatically by partition manager in the
-# single remaining gap between MBR and bootloader_reserved.
+# remaining gap (0x1000 - 0xcc000). Do NOT define it statically.
+
+zboss_nvram:
+  address: 0xcc000
+  end_address: 0xd4000
+  region: flash_primary
+  size: 0x8000
+  placement:
+    before:
+      - zboss_product_config
+
+zboss_product_config:
+  address: 0xd4000
+  end_address: 0xd8000
+  region: flash_primary
+  size: 0x4000
+  placement:
+    before:
+      - bootloader_reserved
 
 bootloader_reserved:
   address: 0xd8000
