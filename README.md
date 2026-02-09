@@ -98,6 +98,17 @@ If double-tap reset no longer enters bootloader mode:
 [00:00:00.100,000] <inf> frostbee: SHT40 sensor ready
 ```
 
+## Home Assistant Integration
+
+Frostbee works with both Zigbee2MQTT and ZHA:
+
+| Integration | Setup | Folder |
+|---|---|---|
+| **Zigbee2MQTT** | External converter (copy + config edit) | [`zigbee2mqtt/`](zigbee2mqtt/) |
+| **ZHA** | Works out of the box; optional quirk for device naming | [`zha/`](zha/) |
+
+See the README in each folder for step-by-step instructions.
+
 ## License
 
 MIT
