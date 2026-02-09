@@ -11,8 +11,10 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/reboot.h>
 #include <ram_pwrdn.h>
 
 #include <zboss_api.h>
@@ -25,8 +27,19 @@
 
 LOG_MODULE_REGISTER(frostbee, LOG_LEVEL_INF);
 
+/* Forward declaration for button handler */
+static void sensor_read_and_update(zb_bufid_t bufid);
+
 /* Sensor read interval in seconds (used for ZBOSS alarm scheduling). */
 #define SENSOR_READ_INTERVAL_S  10  /* 10s for dev, 600s for production */
+
+/* Reset button timing (milliseconds) */
+#define BUTTON_DEBOUNCE_MS         100    /* Ignore edges within this window */
+#define BUTTON_SHORT_PRESS_MAX_MS  1000   /* < 1s = short press (restart) */
+#define BUTTON_FACTORY_RESET_MS    5000   /* >= 5s = factory reset */
+
+/* Reset button GPIO */
+#define RESET_BUTTON_NODE DT_ALIAS(sw0)
 
 /* Keep Zigbee network data across reboots.
  * Device remembers paired network - no rejoin needed after restart.
@@ -83,6 +96,115 @@ static struct zb_device_ctx dev_ctx;
 
 /* Sensor device handle */
 static const struct device *sht;
+
+/* Reset button */
+#if DT_NODE_EXISTS(RESET_BUTTON_NODE)
+static const struct gpio_dt_spec reset_button = GPIO_DT_SPEC_GET(RESET_BUTTON_NODE, gpios);
+static struct gpio_callback button_cb_data;
+static int64_t button_press_time;
+static bool button_pressed_state;  /* Track logical state */
+static bool long_press_handled;    /* Already triggered factory reset */
+static struct k_work_delayable debounce_work;
+static struct k_work_delayable factory_reset_work;
+
+static void factory_reset_handler(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	/* Check if button is still held */
+	if (gpio_pin_get_dt(&reset_button) == 1) {
+		long_press_handled = true;
+		LOG_WRN("Factory reset - erasing Zigbee NVRAM");
+		zigbee_erase_persistent_storage(ZB_TRUE);
+		sys_reboot(SYS_REBOOT_COLD);
+	}
+}
+
+static void debounce_handler(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	/* Read the settled state after debounce period */
+	int pressed = gpio_pin_get_dt(&reset_button);
+
+	/* Only act if state actually changed */
+	if (pressed == button_pressed_state) {
+		return;
+	}
+	button_pressed_state = pressed;
+
+	if (pressed) {
+		/* Button pressed - record time and schedule factory reset check */
+		button_press_time = k_uptime_get();
+		long_press_handled = false;
+		k_work_schedule(&factory_reset_work, K_MSEC(BUTTON_FACTORY_RESET_MS));
+		LOG_INF("Button pressed - hold 5s for factory reset");
+	} else {
+		/* Button released - cancel factory reset, check for short press */
+		k_work_cancel_delayable(&factory_reset_work);
+
+		if (long_press_handled) {
+			LOG_INF("Button released after factory reset");
+		} else {
+			int64_t hold_time = k_uptime_get() - button_press_time;
+
+			if (hold_time < BUTTON_SHORT_PRESS_MAX_MS) {
+				LOG_INF("Short press - forcing sensor read");
+				sensor_read_and_update(0);
+			} else {
+				LOG_INF("Button released after %lld ms (no action)", hold_time);
+			}
+		}
+	}
+}
+
+static void button_callback(const struct device *dev, struct gpio_callback *cb,
+			    uint32_t pins)
+{
+	ARG_UNUSED(dev);
+	ARG_UNUSED(cb);
+	ARG_UNUSED(pins);
+
+	/* On any edge, schedule debounce check - it will read settled state */
+	k_work_reschedule(&debounce_work, K_MSEC(BUTTON_DEBOUNCE_MS));
+}
+
+static int button_init(void)
+{
+	int ret;
+
+	if (!gpio_is_ready_dt(&reset_button)) {
+		LOG_ERR("Reset button GPIO not ready");
+		return -ENODEV;
+	}
+
+	ret = gpio_pin_configure_dt(&reset_button, GPIO_INPUT);
+	if (ret < 0) {
+		LOG_ERR("Failed to configure reset button: %d", ret);
+		return ret;
+	}
+
+	ret = gpio_pin_interrupt_configure_dt(&reset_button, GPIO_INT_EDGE_BOTH);
+	if (ret < 0) {
+		LOG_ERR("Failed to configure button interrupt: %d", ret);
+		return ret;
+	}
+
+	gpio_init_callback(&button_cb_data, button_callback,
+			   BIT(reset_button.pin));
+	gpio_add_callback(reset_button.port, &button_cb_data);
+
+	k_work_init_delayable(&debounce_work, debounce_handler);
+	k_work_init_delayable(&factory_reset_work, factory_reset_handler);
+
+	/* Initialize state from current pin level */
+	button_pressed_state = gpio_pin_get_dt(&reset_button);
+
+	LOG_INF("Reset button ready on P0.31 (initial state: %s)",
+		button_pressed_state ? "pressed" : "released");
+	return 0;
+}
+#endif /* DT_NODE_EXISTS(RESET_BUTTON_NODE) */
 
 /* ─── ZCL attribute lists ─── */
 
@@ -391,6 +513,12 @@ int main(void)
 		return -ENODEV;
 	}
 	LOG_INF("SHT40 sensor ready");
+
+#if DT_NODE_EXISTS(RESET_BUTTON_NODE)
+	if (button_init() < 0) {
+		LOG_WRN("Reset button init failed - continuing without it");
+	}
+#endif
 
 	/* Erase persistent storage if requested */
 	zigbee_erase_persistent_storage(ERASE_PERSISTENT_CONFIG);
