@@ -27,15 +27,16 @@
 
 LOG_MODULE_REGISTER(frostbee, LOG_LEVEL_INF);
 
-/* Forward declaration for button handler */
+/* Forward declarations */
 static void sensor_read_and_update(zb_bufid_t bufid);
+static void sensor_read_only(void);
 
 /* Sensor read interval in seconds (used for ZBOSS alarm scheduling). */
 #define SENSOR_READ_INTERVAL_S  10  /* 10s for dev, 600s for production */
 
 /* Reset button timing (milliseconds) */
 #define BUTTON_DEBOUNCE_MS         100    /* Ignore edges within this window */
-#define BUTTON_SHORT_PRESS_MAX_MS  1000   /* < 1s = short press (restart) */
+#define BUTTON_SHORT_PRESS_MAX_MS  1000   /* < 1s = short press (force sensor read) */
 #define BUTTON_FACTORY_RESET_MS    5000   /* >= 5s = factory reset */
 
 /* Reset button GPIO */
@@ -97,6 +98,9 @@ static struct zb_device_ctx dev_ctx;
 /* Sensor device handle */
 static const struct device *sht;
 
+/* Mutex to protect sensor access from concurrent reads */
+static K_MUTEX_DEFINE(sensor_mutex);
+
 /* Reset button */
 #if DT_NODE_EXISTS(RESET_BUTTON_NODE)
 static const struct gpio_dt_spec reset_button = GPIO_DT_SPEC_GET(RESET_BUTTON_NODE, gpios);
@@ -150,7 +154,7 @@ static void debounce_handler(struct k_work *work)
 
 			if (hold_time < BUTTON_SHORT_PRESS_MAX_MS) {
 				LOG_INF("Short press - forcing sensor read");
-				sensor_read_and_update(0);
+				sensor_read_only();
 			} else {
 				LOG_INF("Button released after %lld ms (no action)", hold_time);
 			}
@@ -385,22 +389,28 @@ static void clusters_attr_init(void)
 
 /* ─── Sensor reading & ZCL attribute update ─── */
 
-static void sensor_read_and_update(zb_bufid_t bufid)
+/* Read sensor and update ZCL attributes (without rescheduling).
+ * Used by button handler for on-demand reads.
+ * Thread-safe via mutex - can be called from button or timer context.
+ */
+static void sensor_read_only(void)
 {
 	struct sensor_value temp, hum;
 	int ret;
 
-	ARG_UNUSED(bufid);
+	k_mutex_lock(&sensor_mutex, K_FOREVER);
 
 	if (!device_is_ready(sht)) {
 		LOG_ERR("SHT4X not ready, skipping read");
-		goto reschedule;
+		k_mutex_unlock(&sensor_mutex);
+		return;
 	}
 
 	ret = sensor_sample_fetch(sht);
 	if (ret) {
 		LOG_ERR("Sensor fetch failed: %d", ret);
-		goto reschedule;
+		k_mutex_unlock(&sensor_mutex);
+		return;
 	}
 
 	sensor_channel_get(sht, SENSOR_CHAN_AMBIENT_TEMP, &temp);
@@ -449,7 +459,19 @@ static void sensor_read_and_update(zb_bufid_t bufid)
 		(zb_uint8_t *)&dev_ctx.battery_percentage,
 		ZB_FALSE);
 
-reschedule:
+	k_mutex_unlock(&sensor_mutex);
+}
+
+/* Periodic sensor read callback (called by Zigbee alarm scheduler).
+ * Reads sensor and reschedules next read.
+ */
+static void sensor_read_and_update(zb_bufid_t bufid)
+{
+	ARG_UNUSED(bufid);
+
+	sensor_read_only();
+
+	/* Schedule next periodic read */
 	ZB_SCHEDULE_APP_ALARM(sensor_read_and_update, 0,
 			      ZB_MILLISECONDS_TO_BEACON_INTERVAL(
 				      SENSOR_READ_INTERVAL_S * 1000));
