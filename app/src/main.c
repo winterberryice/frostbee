@@ -111,6 +111,18 @@ static bool long_press_handled;    /* Already triggered factory reset */
 static struct k_work_delayable debounce_work;
 static struct k_work_delayable factory_reset_work;
 
+static void do_factory_reset(zb_uint8_t param)
+{
+	ARG_UNUSED(param);
+
+	LOG_WRN("Factory reset - leaving network and erasing NVRAM");
+	/* This function leaves the network, erases NVRAM, and reboots.
+	 * It's called from ZBOSS context via ZB_SCHEDULE_APP_CALLBACK.
+	 */
+	zb_bdb_reset_via_local_action(param);
+	/* Note: zb_bdb_reset_via_local_action will trigger a reboot internally */
+}
+
 static void factory_reset_handler(struct k_work *work)
 {
 	ARG_UNUSED(work);
@@ -118,13 +130,8 @@ static void factory_reset_handler(struct k_work *work)
 	/* Check if button is still held */
 	if (gpio_pin_get_dt(&reset_button) == 1) {
 		long_press_handled = true;
-		LOG_WRN("Factory reset - erasing Zigbee NVRAM on next boot");
-		/* Set persistent flag to erase NVRAM on next Zigbee stack start.
-		 * This is stored in settings subsystem and survives reboot.
-		 */
-		zigbee_erase_persistent_storage(ZB_TRUE);
-		k_msleep(100); /* Allow settings to flush to flash */
-		sys_reboot(SYS_REBOOT_COLD);
+		/* Schedule factory reset in ZBOSS context */
+		ZB_SCHEDULE_APP_CALLBACK(do_factory_reset, 0);
 	}
 }
 
@@ -152,7 +159,8 @@ static void debounce_handler(struct k_work *work)
 		k_work_cancel_delayable(&factory_reset_work);
 
 		if (long_press_handled) {
-			LOG_INF("Button released after factory reset");
+			LOG_INF("Button released (monitoring now active)");
+			long_press_handled = false;  /* Ready for next press */
 		} else {
 			int64_t hold_time = k_uptime_get() - button_press_time;
 
@@ -205,11 +213,21 @@ static int button_init(void)
 	k_work_init_delayable(&debounce_work, debounce_handler);
 	k_work_init_delayable(&factory_reset_work, factory_reset_handler);
 
-	/* Initialize state from current pin level */
+	/* Initialize state from current pin level.
+	 * If button is pressed on boot (e.g., still held from factory reset),
+	 * wait for release before monitoring to avoid spurious actions.
+	 */
 	button_pressed_state = gpio_pin_get_dt(&reset_button);
 
 	LOG_INF("Reset button ready on P0.31 (initial state: %s)",
 		button_pressed_state ? "pressed" : "released");
+
+	if (button_pressed_state) {
+		LOG_INF("Button held on boot - waiting for release before monitoring");
+		/* Wait for button to be released before starting normal monitoring */
+		long_press_handled = true;  /* Suppress any actions until released */
+	}
+
 	return 0;
 }
 #endif /* DT_NODE_EXISTS(RESET_BUTTON_NODE) */
@@ -501,6 +519,18 @@ void zboss_signal_handler(zb_bufid_t bufid)
 					      ZB_MILLISECONDS_TO_BEACON_INTERVAL(
 						      1000));
 		}
+		break;
+
+	case ZB_ZDO_SIGNAL_LEAVE:
+		/* Factory reset triggered - reboot after leaving network */
+#if DT_NODE_EXISTS(RESET_BUTTON_NODE)
+		if (long_press_handled) {
+			LOG_WRN("Left network after factory reset, rebooting...");
+			k_msleep(100);
+			sys_reboot(SYS_REBOOT_COLD);
+		}
+#endif
+		ZB_ERROR_CHECK(zigbee_default_signal_handler(bufid));
 		break;
 
 	case ZB_ZDO_SIGNAL_PRODUCTION_CONFIG_READY:
