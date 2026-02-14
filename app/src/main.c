@@ -42,11 +42,11 @@ static void sensor_read_only(void);
 /* Reset button GPIO */
 #define RESET_BUTTON_NODE DT_ALIAS(sw0)
 
-/* Keep Zigbee network data across reboots.
- * Device remembers paired network - no rejoin needed after restart.
- * To force rejoin: erase NVRAM via nrfjprog or flash with ZB_TRUE temporarily.
+/* Zigbee network persistence:
+ * By default, network data is kept across reboots (no rejoin needed).
+ * Factory reset (5s button press) triggers NVRAM erase on next boot.
+ * The erase flag is stored in settings subsystem and survives reboot.
  */
-#define ERASE_PERSISTENT_CONFIG ZB_FALSE
 
 /* Basic cluster metadata */
 #define FROSTBEE_INIT_BASIC_APP_VERSION    1
@@ -118,8 +118,12 @@ static void factory_reset_handler(struct k_work *work)
 	/* Check if button is still held */
 	if (gpio_pin_get_dt(&reset_button) == 1) {
 		long_press_handled = true;
-		LOG_WRN("Factory reset - erasing Zigbee NVRAM");
+		LOG_WRN("Factory reset - erasing Zigbee NVRAM on next boot");
+		/* Set persistent flag to erase NVRAM on next Zigbee stack start.
+		 * This is stored in settings subsystem and survives reboot.
+		 */
 		zigbee_erase_persistent_storage(ZB_TRUE);
+		k_msleep(100); /* Allow settings to flush to flash */
 		sys_reboot(SYS_REBOOT_COLD);
 	}
 }
@@ -541,9 +545,6 @@ int main(void)
 		LOG_WRN("Reset button init failed - continuing without it");
 	}
 #endif
-
-	/* Erase persistent storage if requested */
-	zigbee_erase_persistent_storage(ERASE_PERSISTENT_CONFIG);
 
 	/* Configure as sleepy end device */
 	zb_set_ed_timeout(ED_AGING_TIMEOUT_64MIN);
