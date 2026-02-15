@@ -9,7 +9,43 @@ and ZBOSS Zigbee stack (Sleepy End Device).
 
 - **Board:** nRF52840 Dongle (PCA10059)
 - **Sensor:** Sensirion SHT40-AD1B (I2C address 0x44)
-- **Pins:** SDA = P0.24, SCL = P1.00 (100 kHz)
+
+### Pin Assignment
+
+| Function | Pin | Description |
+|----------|-----|-------------|
+| **I2C SDA** | P0.24 | SHT40 sensor data |
+| **I2C SCL** | P1.00 | SHT40 sensor clock (100 kHz) |
+| **Battery ADC** | P0.29 (AIN5) | Battery voltage measurement |
+| **Battery Enable** | P0.02 | Voltage divider control (active LOW = GND) |
+| **Reset Button** | P0.31 | Factory reset / force read |
+| **Status LED** | P0.15 | Blue LED (active LOW) |
+
+### Battery Voltage Measurement
+
+The device measures battery voltage (3× AA in series, 3.0V - 4.5V) using a voltage divider with GPIO control for power saving:
+
+```
+BAT+ ─── R1 (10kΩ) ─── [P0.29/ADC] ─┬─── R2 (10kΩ) ─── [P0.02/GPIO] ─── GND
+                                     │
+                                     └─── C (0.1µF) ─── GND
+```
+
+**How it works:**
+- **P0.02** is configured as **INPUT** (high-Z) when not measuring → 0µA power consumption
+- During measurement (every 10s), **P0.02** is set to **OUTPUT LOW** → connects divider to GND
+- ADC reads voltage on **P0.29**, then **P0.02** returns to INPUT mode
+- Measurement duration: ~2ms per reading
+
+**Components:**
+- R1, R2: 10kΩ (voltage divider 1:2, scales 4.5V → 2.25V for ADC)
+- C1: 0.1µF (noise filtering, RC time constant = 1ms)
+- Power consumption: 150µA for ~2ms = 0.0008 mAh/day (negligible)
+
+**Voltage ranges:**
+- 3× AA fresh: 4.5V → 2.25V at ADC → 100% battery
+- 3× AA depleted: 3.0V → 1.5V at ADC → 0% battery
+- Low battery alarm: 3.0V (1.0V per cell)
 
 ## Build & Flash
 
