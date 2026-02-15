@@ -23,6 +23,38 @@
 		led0 = &led0_green;
 		sw0 = &reset_button;
 	};
+
+	/* Battery voltage divider control */
+	vbat {
+		compatible = "voltage-divider";
+		io-channels = <&adc 5>;  /* P0.29 = AIN5 */
+		output-ohms = <10000>;   /* R2 = 10kΩ */
+		full-ohms = <20000>;     /* R1 + R2 = 20kΩ */
+	};
+
+	vbat_enable {
+		compatible = "gpio-leds";
+		vbat_en: vbat_enable_pin {
+			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;  /* P0.02, active LOW = GND */
+			label = "Battery voltage divider enable";
+		};
+	};
+};
+
+/* ADC for battery voltage measurement on P0.29 (AIN5) */
+&adc {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@5 {
+		reg = <5>;
+		zephyr,gain = "ADC_GAIN_1_6";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,input-positive = <NRF_SAADC_AIN5>;  /* P0.29 */
+		zephyr,resolution = <12>;
+	};
 };
 
 /* I2C bus for SHT40: SDA = P0.24, SCL = P1.00 */

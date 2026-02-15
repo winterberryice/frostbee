@@ -13,6 +13,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/sensor.h>
+#include <zephyr/drivers/adc.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/reboot.h>
 #include <ram_pwrdn.h>
@@ -97,6 +98,40 @@ static struct zb_device_ctx dev_ctx;
 
 /* Sensor device handle */
 static const struct device *sht;
+
+/* ─── Battery voltage measurement ─── */
+
+/* ADC configuration for P0.29 (AIN5) */
+#define ADC_NODE        DT_NODELABEL(adc)
+#define ADC_CHANNEL_ID  5
+#define ADC_RESOLUTION  12
+#define ADC_VREF_MV     600   /* Internal reference: 0.6V */
+#define ADC_GAIN_FACTOR 6     /* Gain 1/6 means multiply by 6 */
+
+/* Voltage divider: R1=10kΩ, R2=10kΩ (divides by 2) */
+#define VDIV_FACTOR     2
+
+static const struct device *adc_dev;
+
+static struct adc_channel_cfg adc_cfg = {
+	.gain = ADC_GAIN_1_6,
+	.reference = ADC_REF_INTERNAL,
+	.acquisition_time = ADC_ACQ_TIME_DEFAULT,
+	.channel_id = ADC_CHANNEL_ID,
+	.input_positive = SAADC_CH_PSELP_PSELP_AnalogInput5,  /* AIN5 = P0.29 */
+};
+
+static int16_t adc_sample_buffer;
+
+static struct adc_sequence adc_seq = {
+	.channels = BIT(ADC_CHANNEL_ID),
+	.buffer = &adc_sample_buffer,
+	.buffer_size = sizeof(adc_sample_buffer),
+	.resolution = ADC_RESOLUTION,
+};
+
+/* GPIO to enable voltage divider (P0.02) - active LOW = connected to GND */
+static const struct gpio_dt_spec vbat_enable = GPIO_DT_SPEC_GET(DT_NODELABEL(vbat_en), gpios);
 
 /* Mutex to protect sensor access from concurrent reads */
 static K_MUTEX_DEFINE(sensor_mutex);
@@ -388,14 +423,14 @@ static void clusters_attr_init(void)
 	dev_ctx.identify_attr.identify_time =
 		ZB_ZCL_IDENTIFY_IDENTIFY_TIME_DEFAULT_VALUE;
 
-	/* Power configuration — AA batteries */
-	dev_ctx.battery_voltage = 30;  /* 3.0V in units of 100mV */
-	dev_ctx.battery_percentage = 164; /* 82% (ZCL uses 0.5% units, so 164 = 82%) */
+	/* Power configuration — 3× AA batteries in series */
+	dev_ctx.battery_voltage = 45;  /* 4.5V in units of 100mV (fresh batteries) */
+	dev_ctx.battery_percentage = 200; /* 100% (ZCL uses 0.5% units, so 200 = 100%) */
 	dev_ctx.battery_size = ZB_ZCL_POWER_CONFIG_BATTERY_SIZE_AA;
-	dev_ctx.battery_quantity = 2;
+	dev_ctx.battery_quantity = 3;  /* 3× AA in series */
 	dev_ctx.battery_rated_voltage = 15; /* 1.5V per cell in units of 100mV */
 	dev_ctx.battery_alarm_mask = 0;
-	dev_ctx.battery_voltage_min_threshold = 20; /* 2.0V alarm threshold */
+	dev_ctx.battery_voltage_min_threshold = 30; /* 3.0V alarm threshold (1.0V per cell) */
 
 	/* Temperature measurement */
 	dev_ctx.temp_measure_value = ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_UNKNOWN;
@@ -407,6 +442,114 @@ static void clusters_attr_init(void)
 	dev_ctx.hum_measure_value = ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_VALUE_UNKNOWN;
 	dev_ctx.hum_min_value = FROSTBEE_HUM_MIN_VALUE;
 	dev_ctx.hum_max_value = FROSTBEE_HUM_MAX_VALUE;
+}
+
+/* ─── Battery voltage measurement ─── */
+
+/* Compare function for qsort - ascending order */
+static int compare_int16(const void *a, const void *b)
+{
+	return (*(int16_t *)a - *(int16_t *)b);
+}
+
+/* Read battery voltage via ADC with voltage divider enable/disable.
+ *
+ * Circuit: BAT+ → R1(10kΩ) → [P0.29/ADC] → R2(10kΩ) → [P0.02/GPIO] → GND
+ *                                        └→ C(0.1µF) → GND
+ *
+ * Power saving: P0.02 configured as INPUT (high-Z) when not measuring.
+ *               Only set to OUTPUT LOW when reading ADC (enables divider).
+ *
+ * Measurement strategy: Take 5 samples, remove min/max, average middle 3.
+ * This eliminates ADC noise and transient spikes.
+ *
+ * Returns battery voltage in ZCL format (units of 100mV), or 0 on error.
+ */
+static uint8_t read_battery_voltage(void)
+{
+	int ret;
+	int16_t samples[5];
+
+	if (!device_is_ready(adc_dev)) {
+		LOG_ERR("ADC device not ready");
+		return 0;
+	}
+
+	/* Enable voltage divider: set P0.02 as OUTPUT LOW (connects R2 to GND) */
+	ret = gpio_pin_configure_dt(&vbat_enable, GPIO_OUTPUT_ACTIVE);
+	if (ret < 0) {
+		LOG_ERR("Failed to enable voltage divider: %d", ret);
+		return 0;
+	}
+
+	/* Wait for capacitor to charge and voltage to stabilize
+	 * RC = 10kΩ × 0.1µF = 1ms, wait 2ms to be safe
+	 */
+	k_msleep(2);
+
+	/* Take 5 ADC samples */
+	for (int i = 0; i < 5; i++) {
+		ret = adc_read(adc_dev, &adc_seq);
+		if (ret < 0) {
+			LOG_ERR("ADC read %d failed: %d", i, ret);
+			gpio_pin_configure_dt(&vbat_enable, GPIO_INPUT);
+			return 0;
+		}
+		samples[i] = adc_sample_buffer;
+
+		/* Small delay between samples to allow ADC to settle */
+		if (i < 4) {
+			k_usleep(500);  /* 500µs between samples */
+		}
+	}
+
+	/* Disable voltage divider: set P0.02 as INPUT (high impedance, ~0µA) */
+	gpio_pin_configure_dt(&vbat_enable, GPIO_INPUT);
+
+	/* Sort samples to find min/max */
+	qsort(samples, 5, sizeof(int16_t), compare_int16);
+
+	/* Average the middle 3 values (exclude min=samples[0] and max=samples[4]) */
+	int32_t sum = samples[1] + samples[2] + samples[3];
+	int16_t avg_sample = sum / 3;
+
+	LOG_DBG("ADC samples: [%d, %d, %d, %d, %d] → avg of middle 3: %d",
+		samples[0], samples[1], samples[2], samples[3], samples[4], avg_sample);
+
+	/* Convert ADC value to millivolts at ADC pin (P0.29)
+	 * Formula: mV = (sample × VREF_mV × GAIN_FACTOR) / (2^12 - 1)
+	 * Example: sample=2048 → (2048 × 600 × 6) / 4095 = 1800mV
+	 */
+	int32_t adc_mv = ((int32_t)avg_sample * ADC_VREF_MV * ADC_GAIN_FACTOR) / 4095;
+
+	/* Actual battery voltage (voltage divider is 1:2, so multiply by 2) */
+	int32_t battery_mv = adc_mv * VDIV_FACTOR;
+
+	/* Convert to ZCL format: units of 100mV */
+	uint8_t battery_zcl = (uint8_t)(battery_mv / 100);
+
+	/* Calculate battery percentage (linear approximation for 3× AA batteries):
+	 * 4.5V (fresh) = 100%, 3.0V (depleted) = 0%
+	 * ZCL uses 0.5% units, so 200 = 100%, 0 = 0%
+	 */
+	int32_t percentage_raw = ((battery_mv - 3000) * 200) / 1500;
+	if (percentage_raw < 0) {
+		percentage_raw = 0;
+	}
+	if (percentage_raw > 200) {
+		percentage_raw = 200;
+	}
+	uint8_t battery_pct = (uint8_t)percentage_raw;
+
+	LOG_INF("Battery: %d mV (ZCL=%u), %u%% (ZCL=%u)",
+		battery_mv, battery_zcl,
+		battery_pct / 2, battery_pct);
+
+	/* Update device context */
+	dev_ctx.battery_voltage = battery_zcl;
+	dev_ctx.battery_percentage = battery_pct;
+
+	return battery_zcl;
 }
 
 /* ─── Sensor reading & ZCL attribute update ─── */
@@ -472,7 +615,18 @@ static void sensor_read_only(void)
 		(zb_uint8_t *)&hum_zcl,
 		ZB_FALSE);
 
-	/* Battery percentage: static 82% for now (TODO: read actual voltage) */
+	/* Read battery voltage via ADC */
+	read_battery_voltage();
+
+	/* Update battery ZCL attributes */
+	ZB_ZCL_SET_ATTRIBUTE(
+		FROSTBEE_ENDPOINT,
+		ZB_ZCL_CLUSTER_ID_POWER_CONFIG,
+		ZB_ZCL_CLUSTER_SERVER_ROLE,
+		ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID,
+		(zb_uint8_t *)&dev_ctx.battery_voltage,
+		ZB_FALSE);
+
 	ZB_ZCL_SET_ATTRIBUTE(
 		FROSTBEE_ENDPOINT,
 		ZB_ZCL_CLUSTER_ID_POWER_CONFIG,
@@ -569,6 +723,33 @@ int main(void)
 		return -ENODEV;
 	}
 	LOG_INF("SHT40 sensor ready");
+
+	/* Initialize ADC for battery voltage measurement */
+	adc_dev = DEVICE_DT_GET(ADC_NODE);
+	if (!device_is_ready(adc_dev)) {
+		LOG_ERR("ADC device not ready");
+		return -ENODEV;
+	}
+
+	if (adc_channel_setup(adc_dev, &adc_cfg) < 0) {
+		LOG_ERR("ADC channel setup failed");
+		return -EIO;
+	}
+	LOG_INF("ADC ready on P0.29 (AIN5) for battery voltage");
+
+	/* Initialize GPIO for voltage divider control (P0.02)
+	 * Start as INPUT (high-Z) to save power - divider is OFF by default
+	 */
+	if (!gpio_is_ready_dt(&vbat_enable)) {
+		LOG_ERR("Battery enable GPIO not ready");
+		return -ENODEV;
+	}
+
+	if (gpio_pin_configure_dt(&vbat_enable, GPIO_INPUT) < 0) {
+		LOG_ERR("Failed to configure battery enable GPIO");
+		return -EIO;
+	}
+	LOG_INF("Battery voltage divider control ready on P0.02 (default: OFF)");
 
 #if DT_NODE_EXISTS(RESET_BUTTON_NODE)
 	if (button_init() < 0) {
