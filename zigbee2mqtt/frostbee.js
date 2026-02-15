@@ -1,15 +1,9 @@
-const {temperature, humidity, battery} = require('zigbee-herdsman-converters/lib/modernExtend');
+import * as m from 'zigbee-herdsman-converters/lib/modernExtend';
 
-const definition = {
+export default {
     zigbeeModel: ['FBE_TH_1'],
     model: 'FBE_TH_1',
     vendor: 'Frostbee',
     description: 'Temperature & humidity sensor (SHT40)',
-    extend: [
-        temperature(),
-        humidity(),
-        battery(),
-    ],
+    extend: [m.battery(), m.temperature(), m.humidity()],
 };
-
-module.exports = definition;
